@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Activity Log - School Inventory</title>
+    <link rel="stylesheet" href="assets/css/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+</head>
+<body>
+<div class="layout">
+    <div id="sidebar-root"></div>
+
+    <main class="content">
+        <div id="topbar-root"></div>
+
+        <div class="page-wrap">
+            <header class="page-header">
+                <div>
+                    <h1>Activity Log</h1>
+                    <p>Recent admin actions in the system.</p>
+                </div>
+                <div class="page-actions">
+                    <select id="filter-type" class="btn" style="background:var(--panel-2);">
+                        <option value="">All Types</option>
+                        <option value="add">Added</option>
+                        <option value="edit">Edited</option>
+                        <option value="delete">Deleted</option>
+                        <option value="login">Login</option>
+                    </select>
+                    <button class="btn btn-danger" onclick="clearLog()">🗑 Clear Log</button>
+                </div>
+            </header>
+
+            <div class="alert alert-success" id="flash-msg" style="display:none;"></div>
+
+            <div class="panel">
+                <div class="panel-header">
+                    <div>
+                        <h2>Activity Timeline</h2>
+                        <div class="subtitle" id="log-count">0 entries</div>
+                    </div>
+                </div>
+                <div class="activity-list" id="activity-list"></div>
+            </div>
+        </div>
+    </main>
+</div>
+
+<script src="assets/js/app.js"></script>
+<script>
+    Auth.requireAdmin();
+    renderSidebar('activity');
+    renderTopbar();
+
+    const icons = { add: '➕', edit: '✏️', delete: '🗑️', login: '🔑' };
+
+    function render() {
+        const filter = document.getElementById('filter-type').value;
+        let activity = Store.getActivity();
+        if (filter) activity = activity.filter(a => a.type === filter);
+
+        document.getElementById('log-count').textContent = activity.length + ' entries';
+        const el = document.getElementById('activity-list');
+
+        if (activity.length === 0) {
+            el.innerHTML = '<div class="empty">No activity yet.</div>';
+            return;
+        }
+
+        el.innerHTML = activity.map(a => `
+            <div class="activity-item">
+                <div class="activity-dot ${a.type}">${icons[a.type] || '•'}</div>
+                <div class="activity-body">
+                    <div class="action">${escapeHTML(a.action)}</div>
+                    <div class="meta">by <b>${escapeHTML(a.user)}</b> • ${timeAgo(a.timestamp)} • ${new Date(a.timestamp).toLocaleString()}</div>
+                </div>
+            </div>
+        `).join('');
+    }
+
+    function clearLog() {
+        if (!confirm('Clear all activity log entries?')) return;
+        Store.clearActivity();
+        flash('Activity log cleared.');
+        render();
+    }
+
+    document.getElementById('filter-type').addEventListener('change', render);
+    render();
+</script>
+</body>
+</html>

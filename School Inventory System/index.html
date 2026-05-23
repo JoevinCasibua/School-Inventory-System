@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Login - School Supply Inventory</title>
+    <link rel="stylesheet" href="assets/css/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+</head>
+<body class="login-body">
+    <div class="login-split">
+        <div class="login-art">
+            <div class="login-art-content">
+                <div class="login-logo">
+                    <div class="login-logo-icon">📦</div>
+                    <span>SCHOOL SHOP</span>
+                </div>
+                <div class="login-hero">
+                    <h1>Hello <br>there!<span>👋</span></h1>
+                    <p>Browse and buy school supplies online. Pay at the school cashier when you pick up your order — fast, simple, and secure.</p>
+                </div>
+            </div>
+            <div class="login-footer-text">© 2026 School Supply Inventory. All rights reserved.</div>
+        </div>
+
+        <div class="login-form-wrap">
+            <div class="login-form-box">
+                <div class="login-form-brand">📦 SchoolShop</div>
+
+                <h2>Welcome Back!</h2>
+                <p class="subtitle">Sign in to continue. Choose Student to shop, or Admin to manage inventory.</p>
+
+                <div class="login-tabs">
+                    <button class="login-tab active" data-tab="customer">🎓 Student</button>
+                    <button class="login-tab" data-tab="admin">🔐 Admin</button>
+                </div>
+
+                <div class="alert alert-error" id="error-msg" style="display:none;"></div>
+
+                <form id="login-form">
+                    <div class="form-group">
+                        <label>Username</label>
+                        <input type="text" id="username" placeholder="username" required autofocus>
+                    </div>
+                    <div class="form-group">
+                        <label>Password</label>
+                        <input type="password" id="password" placeholder="••••••••" required>
+                    </div>
+                    <button type="submit" class="btn-login">Login Now</button>
+                </form>
+
+                <div class="login-switch" id="register-link">
+                    Don't have an account? <a href="register.html">Sign up here</a>
+                </div>
+
+                <div class="login-hint-card">
+                    <div id="hint-customer">Student demo: <b>student1</b> / <b>student123</b></div>
+                    <div id="hint-admin" style="display:none;">Admin demo: <b>admin</b> / <b>admin123</b></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="assets/js/app.js"></script>
+    <script>
+        if (Auth.currentUser()) {
+            const u = Auth.currentUser();
+            window.location.href = u.type === 'customer' ? 'shop.html' : 'dashboard.html';
+        }
+
+        let mode = 'customer';
+        const tabs = document.querySelectorAll('.login-tab');
+        tabs.forEach(tab => {
+            tab.addEventListener('click', () => {
+                tabs.forEach(t => t.classList.remove('active'));
+                tab.classList.add('active');
+                mode = tab.dataset.tab;
+                document.getElementById('hint-customer').style.display = mode === 'customer' ? '' : 'none';
+                document.getElementById('hint-admin').style.display = mode === 'admin' ? '' : 'none';
+                document.getElementById('register-link').style.display = mode === 'customer' ? '' : 'none';
+            });
+        });
+
+        document.getElementById('login-form').addEventListener('submit', e => {
+            e.preventDefault();
+            const u = document.getElementById('username').value.trim();
+            const p = document.getElementById('password').value;
+            const err = document.getElementById('error-msg');
+            err.style.display = 'none';
+
+            let ok = false;
+            if (mode === 'admin') ok = Auth.loginAdmin(u, p);
+            else ok = Auth.loginCustomer(u, p);
+
+            if (ok) {
+                window.location.href = mode === 'admin' ? 'dashboard.html' : 'shop.html';
+            } else {
+                err.textContent = 'Invalid username or password.';
+                err.style.display = 'block';
+            }
+        });
+    </script>
+</body>
+</html>

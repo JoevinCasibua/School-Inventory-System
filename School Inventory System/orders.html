@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Orders - School Inventory</title>
+    <link rel="stylesheet" href="assets/css/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+</head>
+<body>
+<div class="layout">
+    <div id="sidebar-root"></div>
+
+    <main class="content">
+        <div id="topbar-root"></div>
+
+        <div class="page-wrap">
+            <header class="page-header">
+                <div>
+                    <h1>Customer Orders</h1>
+                    <p>Manage student orders. Mark as paid when cash is received at the cashier.</p>
+                </div>
+                <div class="page-actions">
+                    <button class="btn" onclick="exportCSV()">⬇ Export CSV</button>
+                </div>
+            </header>
+
+            <div class="alert alert-success" id="flash-msg" style="display:none;"></div>
+
+            <div class="cards">
+                <div class="card orange">
+                    <div class="card-icon">⏳</div>
+                    <div class="card-info"><h3 id="stat-pending">0</h3><p>Pending Payment</p></div>
+                </div>
+                <div class="card">
+                    <div class="card-icon">💵</div>
+                    <div class="card-info"><h3 id="stat-paid">0</h3><p>Paid (Ready)</p></div>
+                </div>
+                <div class="card blue">
+                    <div class="card-icon">✅</div>
+                    <div class="card-info"><h3 id="stat-completed">0</h3><p>Completed</p></div>
+                </div>
+                <div class="card red">
+                    <div class="card-icon">💰</div>
+                    <div class="card-info"><h3 id="stat-revenue">₱0</h3><p>Revenue (Paid)</p></div>
+                </div>
+            </div>
+
+            <div class="panel">
+                <div class="panel-header">
+                    <form class="search-form" onsubmit="event.preventDefault(); render();">
+                        <input type="text" id="search-input" placeholder="🔍 Search order #, customer, student ID...">
+                        <select id="status-filter">
+                            <option value="">All Statuses</option>
+                            <option value="pending">⏳ Pending Payment</option>
+                            <option value="paid">💵 Paid</option>
+                            <option value="completed">✅ Completed</option>
+                            <option value="cancelled">✖ Cancelled</option>
+                        </select>
+                        <button type="button" class="btn btn-ghost" onclick="clearFilters()">Clear</button>
+                    </form>
+                </div>
+
+                <div class="table-wrap">
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>Order #</th>
+                                <th>Customer</th>
+                                <th>Items</th>
+                                <th>Total</th>
+                                <th>Status</th>
+                                <th>Date</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="orders-tbody"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </main>
+</div>
+
+<!-- Detail modal -->
+<div class="modal" id="orderModal">
+    <div class="modal-content" style="max-width: 600px;">
+        <div class="modal-header">
+            <h2 id="modal-title">Order Details</h2>
+            <button class="modal-close" onclick="closeModal('orderModal')">&times;</button>
+        </div>
+        <div style="padding: 24px;" id="modal-body"></div>
+    </div>
+</div>
+
+<script src="assets/js/app.js"></script>
+<script>
+    Auth.requireAdmin();
+    renderSidebar('orders');
+    renderTopbar();
+
+    function filtered() {
+        const search = document.getElementById('search-input').value.trim().toLowerCase();
+        const status = document.getElementById('status-filter').value;
+        let list = Store.getOrders().slice().sort((a, b) => b.created_at - a.created_at);
+        if (search) list = list.filter(o =>
+            o.order_number.toLowerCase().includes(search) ||
+            (o.customer_name || '').toLowerCase().includes(search) ||
+            (o.student_id || '').toLowerCase().includes(search)
+        );
+        if (status) list = list.filter(o => o.status === status);
+        return list;
+    }
+
+    function render() {
+        const all = Store.getOrders();
+        document.getElementById('stat-pending').textContent = all.filter(o => o.status === 'pending').length;
+        document.getElementById('stat-paid').textContent = all.filter(o => o.status === 'paid').length;
+        document.getElementById('stat-completed').textContent = all.filter(o => o.status === 'completed').length;
+        const revenue = all.filter(o => o.status === 'paid' || o.status === 'completed').reduce((s, o) => s + o.total, 0);
+        document.getElementById('stat-revenue').textContent = formatPeso(revenue);
+
+        const list = filtered();
+        const tbody = document.getElementById('orders-tbody');
+        if (list.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="7" class="empty">No orders found.</td></tr>';
+            return;
+        }
+        tbody.innerHTML = list.map(o => {
+            const st = ORDER_STATUS[o.status] || ORDER_STATUS.pending;
+            return `
+                <tr>
+                    <td><strong>${escapeHTML(o.order_number)}</strong></td>
+                    <td>
+                        <div class="product-name">${escapeHTML(o.customer_name)}</div>
+                        <div class="product-sku">${escapeHTML(o.student_id || '')}</div>
+                    </td>
+                    <td>${o.items.reduce((s, i) => s + i.quantity, 0)} units</td>
+                    <td><strong>${formatPeso(o.total)}</strong></td>
+                    <td><span class="badge ${st.color}">${st.icon} ${st.label}</span></td>
+                    <td class="text-muted">${formatDateTime(o.created_at)}</td>
+                    <td class="actions">
+                        <button class="btn btn-sm" onclick="viewOrder(${o.id})">View</button>
+                        ${o.status === 'pending' ? `<button class="btn btn-sm btn-primary" onclick="markPaid(${o.id})">💵 Mark Paid</button>` : ''}
+                        ${o.status === 'paid' ? `<button class="btn btn-sm btn-primary" onclick="markCompleted(${o.id})">✅ Complete</button>` : ''}
+                        ${(o.status === 'pending' || o.status === 'paid') ? `<button class="btn btn-sm btn-danger" onclick="cancelOrder(${o.id})">✖</button>` : ''}
+                    </td>
+                </tr>
+            `;
+        }).join('');
+    }
+
+    function viewOrder(id) {
+        const o = Store.getOrders().find(x => x.id === id);
+        if (!o) return;
+        const st = ORDER_STATUS[o.status] || ORDER_STATUS.pending;
+        document.getElementById('modal-title').textContent = 'Order ' + o.order_number;
+        document.getElementById('modal-body').innerHTML = `
+            <div class="receipt-info">
+                <div class="cart-summary-row"><span>Status</span><span class="badge ${st.color}">${st.icon} ${st.label}</span></div>
+                <div class="cart-summary-row"><span>Customer</span><span>${escapeHTML(o.customer_name)}</span></div>
+                ${o.student_id ? `<div class="cart-summary-row"><span>Student ID</span><span>${escapeHTML(o.student_id)}</span></div>` : ''}
+                <div class="cart-summary-row"><span>Placed</span><span>${formatDateTime(o.created_at)}</span></div>
+                ${o.paid_at ? `<div class="cart-summary-row"><span>Paid</span><span>${formatDateTime(o.paid_at)}</span></div>` : ''}
+                ${o.completed_at ? `<div class="cart-summary-row"><span>Completed</span><span>${formatDateTime(o.completed_at)}</span></div>` : ''}
+            </div>
+
+            <h3 style="margin: 18px 0 10px;">Items (${o.items.reduce((s, i) => s + i.quantity, 0)} units)</h3>
+            <div class="receipt-info">
+                ${o.items.map(i => `
+                    <div class="cart-summary-row">
+                        <span>${escapeHTML(i.name)} <span class="text-muted">× ${i.quantity}</span></span>
+                        <span>${formatPeso(i.subtotal)}</span>
+                    </div>
+                `).join('')}
+                <div class="cart-summary-row total"><span>TOTAL</span><span>${formatPeso(o.total)}</span></div>
+            </div>
+
+            ${o.notes ? `<div class="receipt-info"><b>Notes:</b><br>${escapeHTML(o.notes)}</div>` : ''}
+
+            <div style="display:flex;gap:10px;margin-top:20px;flex-wrap:wrap;">
+                ${o.status === 'pending' ? `<button class="btn btn-primary" onclick="markPaid(${o.id}); closeModal('orderModal');">💵 Mark as Paid</button>` : ''}
+                ${o.status === 'paid' ? `<button class="btn btn-primary" onclick="markCompleted(${o.id}); closeModal('orderModal');">✅ Mark as Completed</button>` : ''}
+                ${(o.status === 'pending' || o.status === 'paid') ? `<button class="btn btn-danger" onclick="cancelOrder(${o.id}); closeModal('orderModal');">✖ Cancel Order</button>` : ''}
+            </div>
+        `;
+        openModal('orderModal');
+    }
+
+    function markPaid(id) {
+        if (!confirm('Confirm payment received at the cashier?')) return;
+        Store.updateOrderStatus(id, 'paid');
+        flash('Order marked as paid.');
+        render();
+    }
+
+    function markCompleted(id) {
+        if (!confirm('Mark this order as completed (items handed to customer)?')) return;
+        Store.updateOrderStatus(id, 'completed');
+        flash('Order completed.');
+        render();
+    }
+
+    function cancelOrder(id) {
+        if (!confirm('Cancel this order? Stock will be returned to inventory.')) return;
+        Store.updateOrderStatus(id, 'cancelled');
+        flash('Order cancelled. Stock restored.');
+        render();
+    }
+
+    function clearFilters() {
+        document.getElementById('search-input').value = '';
+        document.getElementById('status-filter').value = '';
+        render();
+    }
+
+    function exportCSV() {
+        const rows = [['Order #', 'Customer', 'Student ID', 'Items', 'Total', 'Status', 'Date Placed', 'Date Paid', 'Notes']];
+        Store.getOrders().forEach(o => {
+            rows.push([
+                o.order_number, o.customer_name, o.student_id || '',
+                o.items.reduce((s, i) => s + i.quantity, 0),
+                o.total, o.status,
+                new Date(o.created_at).toLocaleString(),
+                o.paid_at ? new Date(o.paid_at).toLocaleString() : '',
+                o.notes || ''
+            ]);
+        });
+        downloadCSV('orders_' + new Date().toISOString().slice(0,10) + '.csv', rows);
+        flash('Orders exported.');
+    }
+
+    let searchTimer;
+    document.getElementById('search-input').addEventListener('input', () => {
+        clearTimeout(searchTimer);
+        searchTimer = setTimeout(render, 250);
+    });
+    document.getElementById('status-filter').addEventListener('change', render);
+
+    render();
+</script>
+</body>
+</html>

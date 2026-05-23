@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Categories - School Inventory</title>
+    <link rel="stylesheet" href="assets/css/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+</head>
+<body>
+<div class="layout">
+    <div id="sidebar-root"></div>
+
+    <main class="content">
+        <div id="topbar-root"></div>
+
+        <div class="page-wrap">
+            <header class="page-header">
+                <div>
+                    <h1>Categories</h1>
+                    <p>Organize products by category.</p>
+                </div>
+                <div class="page-actions">
+                    <button class="btn btn-primary" onclick="openAddModal()">+ Add Category</button>
+                </div>
+            </header>
+
+            <div class="alert alert-success" id="flash-msg" style="display:none;"></div>
+
+            <div class="cards" id="category-cards"></div>
+
+            <div class="panel">
+                <div class="panel-header"><h2>All Categories</h2></div>
+                <div class="table-wrap">
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Name</th>
+                                <th>Description</th>
+                                <th>Products</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="cat-tbody"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </main>
+</div>
+
+<div class="modal" id="addModal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h2 id="modal-title">+ Add Category</h2>
+            <button class="modal-close" onclick="closeModal('addModal')">&times;</button>
+        </div>
+        <form id="cat-form">
+            <input type="hidden" id="cat-id">
+            <div class="form-group">
+                <label>Category Name *</label>
+                <input type="text" id="cat-name" required>
+            </div>
+            <div class="form-group">
+                <label>Description</label>
+                <textarea id="cat-desc" rows="3"></textarea>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn" onclick="closeModal('addModal')">Cancel</button>
+                <button type="submit" class="btn btn-primary">Save</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script src="assets/js/app.js"></script>
+<script>
+    Auth.requireAdmin();
+    renderSidebar('categories');
+    renderTopbar();
+
+    function render() {
+        const cats = Store.getCategories();
+        const products = Store.getProducts();
+
+        // Cards
+        const cardsEl = document.getElementById('category-cards');
+        cardsEl.innerHTML = cats.map(c => {
+            const count = products.filter(p => p.category === c.name).length;
+            return `
+                <div class="card">
+                    <div class="card-icon">${ICONS[c.name] || '📁'}</div>
+                    <div class="card-info">
+                        <h3>${count}</h3>
+                        <p>${escapeHTML(c.name)}</p>
+                    </div>
+                </div>
+            `;
+        }).join('');
+
+        // Table
+        const tbody = document.getElementById('cat-tbody');
+        if (cats.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="5" class="empty">No categories yet.</td></tr>';
+            return;
+        }
+        tbody.innerHTML = cats.map(c => {
+            const count = products.filter(p => p.category === c.name).length;
+            return `
+                <tr>
+                    <td>#${c.id}</td>
+                    <td>
+                        <div class="product-cell">
+                            <div class="product-img">${ICONS[c.name] || '📁'}</div>
+                            <div class="product-name">${escapeHTML(c.name)}</div>
+                        </div>
+                    </td>
+                    <td class="text-muted">${escapeHTML(c.description || '—')}</td>
+                    <td><span class="badge badge-success">${count} items</span></td>
+                    <td class="actions">
+                        <button class="btn btn-icon btn-sm" onclick="openEditModal(${c.id})">✏️</button>
+                        <button class="btn btn-icon btn-sm btn-danger" onclick="deleteCat(${c.id})">🗑</button>
+                    </td>
+                </tr>
+            `;
+        }).join('');
+    }
+
+    function openAddModal() {
+        document.getElementById('cat-form').reset();
+        document.getElementById('cat-id').value = '';
+        document.getElementById('modal-title').textContent = '+ Add Category';
+        openModal('addModal');
+    }
+
+    function openEditModal(id) {
+        const c = Store.getCategories().find(x => x.id === id);
+        if (!c) return;
+        document.getElementById('cat-id').value = c.id;
+        document.getElementById('cat-name').value = c.name;
+        document.getElementById('cat-desc').value = c.description || '';
+        document.getElementById('modal-title').textContent = '✏️ Edit Category';
+        openModal('addModal');
+    }
+
+    document.getElementById('cat-form').addEventListener('submit', e => {
+        e.preventDefault();
+        const id = document.getElementById('cat-id').value;
+        const data = {
+            name: document.getElementById('cat-name').value.trim(),
+            description: document.getElementById('cat-desc').value.trim()
+        };
+        if (id) {
+            Store.updateCategory(parseInt(id), data);
+            flash('Category updated.');
+        } else {
+            Store.addCategory(data);
+            flash('Category added.');
+        }
+        closeModal('addModal');
+        render();
+    });
+
+    function deleteCat(id) {
+        if (!confirm('Delete this category? Products in this category will not be deleted.')) return;
+        Store.deleteCategory(id);
+        flash('Category deleted.');
+        render();
+    }
+
+    render();
+</script>
+</body>
+</html>

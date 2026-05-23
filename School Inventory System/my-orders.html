@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>My Orders - School Supply Shop</title>
+    <link rel="stylesheet" href="assets/css/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+</head>
+<body class="shop-body">
+    <div id="shop-header-root"></div>
+
+    <main class="shop-main">
+        <header class="page-header">
+            <div>
+                <h1>📋 My Orders</h1>
+                <p>Track your order history and payment status.</p>
+            </div>
+        </header>
+
+        <div class="alert alert-success" id="flash-msg" style="display:none;"></div>
+
+        <div id="orders-content"></div>
+    </main>
+
+    <!-- Order detail modal -->
+    <div class="modal" id="orderModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="modal-title">Order Details</h2>
+                <button class="modal-close" onclick="closeModal('orderModal')">&times;</button>
+            </div>
+            <div style="padding: 24px;" id="modal-body"></div>
+        </div>
+    </div>
+
+    <script src="assets/js/app.js"></script>
+    <script>
+        Auth.requireCustomer();
+        renderShopHeader('my-orders');
+
+        const user = Auth.currentUser();
+
+        function render() {
+            const orders = Store.getCustomerOrders(user.id).sort((a, b) => b.created_at - a.created_at);
+            const el = document.getElementById('orders-content');
+
+            if (orders.length === 0) {
+                el.innerHTML = `
+                    <div class="panel">
+                        <div class="panel-body" style="text-align:center; padding: 60px 20px;">
+                            <div style="font-size: 80px; margin-bottom: 20px;">📦</div>
+                            <h2 style="margin-bottom: 12px;">No orders yet</h2>
+                            <p class="text-muted" style="margin-bottom: 24px;">Browse the shop to place your first order.</p>
+                            <a href="shop.html" class="btn btn-primary">Browse Products</a>
+                        </div>
+                    </div>
+                `;
+                return;
+            }
+
+            el.innerHTML = `
+                <div class="panel">
+                    <div class="panel-header"><h2>All Orders (${orders.length})</h2></div>
+                    <div class="table-wrap">
+                        <table class="table">
+                            <thead>
+                                <tr>
+                                    <th>Order #</th>
+                                    <th>Date</th>
+                                    <th>Items</th>
+                                    <th>Total</th>
+                                    <th>Status</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                            ${orders.map(o => {
+                                const st = ORDER_STATUS[o.status] || ORDER_STATUS.pending;
+                                return `
+                                    <tr>
+                                        <td><strong>${escapeHTML(o.order_number)}</strong></td>
+                                        <td class="text-muted">${formatDateTime(o.created_at)}</td>
+                                        <td>${o.items.length} item${o.items.length > 1 ? 's' : ''} (${o.items.reduce((s, i) => s + i.quantity, 0)} units)</td>
+                                        <td><strong>${formatPeso(o.total)}</strong></td>
+                                        <td><span class="badge ${st.color}">${st.icon} ${st.label}</span></td>
+                                        <td><button class="btn btn-sm" onclick="viewOrder(${o.id})">View Details</button></td>
+                                    </tr>
+                                `;
+                            }).join('')}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            `;
+        }
+
+        function viewOrder(id) {
+            const o = Store.getOrders().find(x => x.id === id);
+            if (!o) return;
+            const st = ORDER_STATUS[o.status] || ORDER_STATUS.pending;
+            document.getElementById('modal-title').textContent = 'Order ' + o.order_number;
+            document.getElementById('modal-body').innerHTML = `
+                <div class="cart-summary-row"><span>Status</span><span class="badge ${st.color}">${st.icon} ${st.label}</span></div>
+                <div class="cart-summary-row"><span>Date Placed</span><span>${formatDateTime(o.created_at)}</span></div>
+                ${o.paid_at ? `<div class="cart-summary-row"><span>Paid On</span><span>${formatDateTime(o.paid_at)}</span></div>` : ''}
+                ${o.completed_at ? `<div class="cart-summary-row"><span>Completed</span><span>${formatDateTime(o.completed_at)}</span></div>` : ''}
+
+                <h3 style="margin: 20px 0 10px;">Items</h3>
+                <div class="receipt-info">
+                    ${o.items.map(i => `
+                        <div class="cart-summary-row">
+                            <span>${escapeHTML(i.name)} × ${i.quantity}</span>
+                            <span>${formatPeso(i.subtotal)}</span>
+                        </div>
+                    `).join('')}
+                    <div class="cart-summary-row total"><span>Total</span><span>${formatPeso(o.total)}</span></div>
+                </div>
+
+                ${o.notes ? `<div style="margin-top:16px;"><b>Notes:</b> ${escapeHTML(o.notes)}</div>` : ''}
+
+                ${o.status === 'pending' ? `
+                    <div class="payment-method-card" style="margin-top:20px;">
+                        <div class="icon">💵</div>
+                        <div>
+                            <div class="title">Awaiting Payment</div>
+                            <div class="desc">Visit the school cashier and present order number <b>${escapeHTML(o.order_number)}</b> to pay <b>${formatPeso(o.total)}</b> in cash.</div>
+                        </div>
+                    </div>` : ''}
+            `;
+            openModal('orderModal');
+        }
+
+        render();
+    </script>
+</body>
+</html>

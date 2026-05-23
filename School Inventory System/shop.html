@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Shop - School Supply Store</title>
+    <link rel="stylesheet" href="assets/css/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+</head>
+<body class="shop-body">
+    <div id="shop-header-root"></div>
+
+    <main class="shop-main">
+        <section class="shop-hero">
+            <div>
+                <h1>Welcome, <span class="text-accent" id="hero-name">Student</span>! 👋</h1>
+                <p>Browse available school supplies, add to cart, and pay at the school cashier when you pick up your order.</p>
+            </div>
+            <div class="hero-art">🎒</div>
+        </section>
+
+        <div class="alert alert-success" id="flash-msg" style="display:none;"></div>
+
+        <div class="shop-toolbar">
+            <form class="search-form" onsubmit="event.preventDefault(); render();">
+                <input type="text" id="search-input" placeholder="🔍 Search products...">
+            </form>
+        </div>
+
+        <div class="shop-cats" id="cat-pills"></div>
+
+        <div class="product-grid" id="product-grid"></div>
+    </main>
+
+    <script src="assets/js/app.js"></script>
+    <script>
+        Auth.requireCustomer();
+        renderShopHeader('shop');
+
+        const user = Auth.currentUser();
+        document.getElementById('hero-name').textContent = user.full_name || user.username;
+
+        let activeCategory = '';
+
+        function renderCats() {
+            const cats = Store.getCategories();
+            const el = document.getElementById('cat-pills');
+            el.innerHTML = `<button class="${activeCategory === '' ? 'active' : ''}" data-cat="">All Products</button>` +
+                cats.map(c => `<button class="${activeCategory === c.name ? 'active' : ''}" data-cat="${escapeHTML(c.name)}">${ICONS[c.name] || '📁'} ${escapeHTML(c.name)}</button>`).join('');
+            el.querySelectorAll('button').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    activeCategory = btn.dataset.cat;
+                    render();
+                });
+            });
+        }
+
+        function render() {
+            renderCats();
+            const search = document.getElementById('search-input').value.trim().toLowerCase();
+            let products = Store.getProducts();
+            if (activeCategory) products = products.filter(p => p.category === activeCategory);
+            if (search) products = products.filter(p =>
+                p.product_name.toLowerCase().includes(search) ||
+                p.category.toLowerCase().includes(search)
+            );
+
+            const grid = document.getElementById('product-grid');
+            if (products.length === 0) {
+                grid.innerHTML = '<div class="empty" style="grid-column:1/-1;">No products found.</div>';
+                return;
+            }
+
+            grid.innerHTML = products.map(p => {
+                const isOut = p.quantity === 0;
+                const isLow = p.quantity > 0 && p.quantity < 5;
+                const stockClass = isOut ? 'out' : isLow ? 'low' : '';
+                const stockLabel = isOut ? 'Out of stock' : `${p.quantity} in stock`;
+                return `
+                    <div class="product-card ${isOut ? 'unavailable' : ''}">
+                        <div class="product-card-img">${ICONS[p.category] || '📦'}</div>
+                        <div class="product-card-body">
+                            <div class="product-card-cat">${escapeHTML(p.category)}</div>
+                            <div class="product-card-name">${escapeHTML(p.product_name)}</div>
+                            <div class="product-card-meta">
+                                <div class="product-card-price">${formatPeso(p.price)}</div>
+                                <div class="product-card-stock ${stockClass}">${stockLabel}</div>
+                            </div>
+                            <button class="btn btn-primary product-card-btn"
+                                onclick="addToCart(${p.id})" ${isOut ? 'disabled' : ''}>
+                                ${isOut ? 'Out of Stock' : '🛒 Add to Cart'}
+                            </button>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function addToCart(id) {
+            const result = Cart.add(id, 1);
+            if (result.ok) {
+                flash('Added to cart!');
+                renderShopHeader('shop');
+            } else {
+                flash(result.msg, 'error');
+            }
+        }
+
+        let searchTimer;
+        document.getElementById('search-input').addEventListener('input', () => {
+            clearTimeout(searchTimer);
+            searchTimer = setTimeout(render, 250);
+        });
+
+        render();
+    </script>
+</body>
+</html>

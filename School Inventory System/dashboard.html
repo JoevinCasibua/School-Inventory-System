@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Dashboard - School Inventory</title>
+    <link rel="stylesheet" href="assets/css/style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+<div class="layout">
+    <div id="sidebar-root"></div>
+
+    <main class="content">
+        <div id="topbar-root"></div>
+
+        <div class="page-wrap">
+            <header class="page-header">
+                <div>
+                    <h1>Dashboard</h1>
+                    <p>Welcome back! Here's what's happening in your inventory.</p>
+                </div>
+                <div class="page-actions">
+                    <button class="btn" onclick="exportInventory()">⬇ Export CSV</button>
+                    <a href="products.html" class="btn btn-primary">+ Add Product</a>
+                </div>
+            </header>
+
+            <div class="cards">
+                <div class="card blue">
+                    <div class="card-icon">📦</div>
+                    <div class="card-info">
+                        <h3 id="stat-total">0</h3>
+                        <p>Total Products</p>
+                    </div>
+                </div>
+                <div class="card">
+                    <div class="card-icon">📊</div>
+                    <div class="card-info">
+                        <h3 id="stat-stock">0</h3>
+                        <p>Total Stock</p>
+                    </div>
+                </div>
+                <div class="card orange">
+                    <div class="card-icon">🛒</div>
+                    <div class="card-info">
+                        <h3 id="stat-pending-orders">0</h3>
+                        <p>Pending Orders</p>
+                    </div>
+                    <a href="orders.html" class="card-trend">View →</a>
+                </div>
+                <div class="card red">
+                    <div class="card-icon">⚠️</div>
+                    <div class="card-info">
+                        <h3 id="stat-low">0</h3>
+                        <p>Low Stock</p>
+                    </div>
+                    <span class="card-trend down">Alert</span>
+                </div>
+            </div>
+
+            <div class="dashboard-grid">
+                <div class="panel">
+                    <div class="panel-header">
+                        <div>
+                            <h2>Stock Levels by Category</h2>
+                            <div class="subtitle">Total units per category</div>
+                        </div>
+                    </div>
+                    <div class="panel-body">
+                        <canvas id="barChart" height="120"></canvas>
+                    </div>
+                </div>
+
+                <div class="panel">
+                    <div class="panel-header">
+                        <div>
+                            <h2>Distribution</h2>
+                            <div class="subtitle">Products by category</div>
+                        </div>
+                    </div>
+                    <div class="panel-body">
+                        <canvas id="doughnutChart"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <div class="dashboard-grid-2">
+                <div class="panel">
+                    <div class="panel-header">
+                        <h2>⚠️ Low Stock Alerts</h2>
+                        <a href="products.html" class="btn btn-sm">View All</a>
+                    </div>
+                    <div class="table-wrap">
+                        <table class="table" id="low-stock-table">
+                            <thead>
+                                <tr><th>Product</th><th>Category</th><th>QTY</th></tr>
+                            </thead>
+                            <tbody></tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div class="panel">
+                    <div class="panel-header">
+                        <h2>📋 Recent Activity</h2>
+                        <a href="activity.html" class="btn btn-sm">View All</a>
+                    </div>
+                    <div class="activity-list" id="activity-list"></div>
+                </div>
+            </div>
+
+            <div class="panel" style="margin-top: 20px;">
+                <div class="panel-header">
+                    <h2>💰 Inventory Value Summary</h2>
+                </div>
+                <div class="panel-body">
+                    <div class="cards" style="margin-bottom: 0;">
+                        <div class="card">
+                            <div class="card-icon">💵</div>
+                            <div class="card-info">
+                                <h3 id="stat-value">₱0</h3>
+                                <p>Total Inventory Value</p>
+                            </div>
+                        </div>
+                        <div class="card blue">
+                            <div class="card-icon">📈</div>
+                            <div class="card-info">
+                                <h3 id="stat-avg-price">₱0</h3>
+                                <p>Average Price</p>
+                            </div>
+                        </div>
+                        <div class="card orange">
+                            <div class="card-icon">🏆</div>
+                            <div class="card-info">
+                                <h3 id="stat-top-cat" style="font-size: 18px;">—</h3>
+                                <p>Top Category</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+</div>
+
+<script src="assets/js/app.js"></script>
+<script>
+    Auth.requireAdmin();
+    renderSidebar('dashboard');
+    renderTopbar();
+
+    const products = Store.getProducts();
+    const threshold = Store.getSettings().low_stock_threshold;
+    const lowItems = products.filter(p => p.quantity < threshold);
+    const categories = [...new Set(products.map(p => p.category))];
+    const totalStock = products.reduce((s, p) => s + Number(p.quantity), 0);
+    const totalValue = products.reduce((s, p) => s + Number(p.quantity) * Number(p.price), 0);
+    const avgPrice = products.length ? totalValue / totalStock : 0;
+
+    const pendingOrders = Store.getOrders().filter(o => o.status === 'pending').length;
+    document.getElementById('stat-total').textContent = products.length;
+    document.getElementById('stat-stock').textContent = totalStock.toLocaleString();
+    document.getElementById('stat-pending-orders').textContent = pendingOrders;
+    document.getElementById('stat-low').textContent = lowItems.length;
+    document.getElementById('stat-value').textContent = formatPeso(totalValue);
+    document.getElementById('stat-avg-price').textContent = formatPeso(avgPrice || 0);
+
+    // Top category
+    const catStock = {};
+    products.forEach(p => { catStock[p.category] = (catStock[p.category] || 0) + p.quantity; });
+    const topCat = Object.entries(catStock).sort((a, b) => b[1] - a[1])[0];
+    if (topCat) document.getElementById('stat-top-cat').textContent = topCat[0];
+
+    // Low stock table
+    const tbody = document.querySelector('#low-stock-table tbody');
+    if (lowItems.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="3" class="empty">All items are well stocked. 🎉</td></tr>';
+    } else {
+        tbody.innerHTML = lowItems.sort((a, b) => a.quantity - b.quantity).slice(0, 6).map(p => `
+            <tr>
+                <td>
+                    <div class="product-cell">
+                        <div class="product-img">${ICONS[p.category] || '📦'}</div>
+                        <div>
+                            <div class="product-name">${escapeHTML(p.product_name)}</div>
+                            <div class="product-sku">${escapeHTML(p.sku || '')}</div>
+                        </div>
+                    </div>
+                </td>
+                <td><span class="tag">${escapeHTML(p.category)}</span></td>
+                <td><span class="badge badge-danger">${p.quantity}</span></td>
+            </tr>
+        `).join('');
+    }
+
+    // Recent activity
+    const recentActivity = Store.getActivity().slice(0, 6);
+    const actEl = document.getElementById('activity-list');
+    if (recentActivity.length === 0) {
+        actEl.innerHTML = '<div class="empty">No recent activity</div>';
+    } else {
+        const icons = { add: '➕', edit: '✏️', delete: '🗑️', login: '🔑' };
+        actEl.innerHTML = recentActivity.map(a => `
+            <div class="activity-item">
+                <div class="activity-dot ${a.type}">${icons[a.type] || '•'}</div>
+                <div class="activity-body">
+                    <div class="action">${escapeHTML(a.action)}</div>
+                    <div class="meta">${escapeHTML(a.user)} • ${timeAgo(a.timestamp)}</div>
+                </div>
+            </div>
+        `).join('');
+    }
+
+    // Bar chart
+    Chart.defaults.color = '#8aa1b8';
+    Chart.defaults.borderColor = '#1f3a55';
+
+    new Chart(document.getElementById('barChart'), {
+        type: 'bar',
+        data: {
+            labels: Object.keys(catStock),
+            datasets: [{
+                label: 'Units in Stock',
+                data: Object.values(catStock),
+                backgroundColor: '#22c55e',
+                borderRadius: 8
+            }]
+        },
+        options: {
+            responsive: true,
+            plugins: { legend: { display: false } },
+            scales: {
+                y: { grid: { color: '#1f3a55' } },
+                x: { grid: { display: false } }
+            }
+        }
+    });
+
+    // Doughnut chart
+    const catCounts = {};
+    products.forEach(p => { catCounts[p.category] = (catCounts[p.category] || 0) + 1; });
+
+    new Chart(document.getElementById('doughnutChart'), {
+        type: 'doughnut',
+        data: {
+            labels: Object.keys(catCounts),
+            datasets: [{
+                data: Object.values(catCounts),
+                backgroundColor: ['#22c55e', '#4f8cff', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4', '#ec4899'],
+                borderWidth: 0
+            }]
+        },
+        options: {
+            responsive: true,
+            plugins: { legend: { position: 'bottom' } }
+        }
+    });
+
+    function exportInventory() {
+        const rows = [['ID', 'SKU', 'Product', 'Category', 'Quantity', 'Price', 'Date Added']];
+        products.forEach(p => {
+            rows.push([p.id, p.sku, p.product_name, p.category, p.quantity, p.price, p.date_added]);
+        });
+        downloadCSV('inventory_' + new Date().toISOString().slice(0,10) + '.csv', rows);
+    }
+</script>
+</body>
+</html>

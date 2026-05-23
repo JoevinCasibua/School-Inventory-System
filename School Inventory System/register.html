@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Sign Up - School Supply Shop</title>
+    <link rel="stylesheet" href="assets/css/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+</head>
+<body class="login-body">
+    <div class="login-split">
+        <div class="login-art">
+            <div class="login-art-content">
+                <div class="login-logo">
+                    <div class="login-logo-icon">📦</div>
+                    <span>SCHOOL SHOP</span>
+                </div>
+                <div class="login-hero">
+                    <h1>Create<br>account!<span>🎓</span></h1>
+                    <p>Sign up as a student to browse, order, and reserve school supplies online. Pay at the cashier when you pick up.</p>
+                </div>
+            </div>
+            <div class="login-footer-text">© 2026 School Supply Inventory. All rights reserved.</div>
+        </div>
+
+        <div class="login-form-wrap">
+            <div class="login-form-box">
+                <div class="login-form-brand">📦 SchoolShop</div>
+
+                <h2>Sign Up</h2>
+                <p class="subtitle">Create a student account to start ordering supplies.</p>
+
+                <div class="alert alert-error" id="error-msg" style="display:none;"></div>
+
+                <form id="register-form">
+                    <div class="form-group">
+                        <label>Full Name</label>
+                        <input type="text" id="full_name" required autofocus>
+                    </div>
+                    <div class="form-group">
+                        <label>Student ID</label>
+                        <input type="text" id="student_id" placeholder="2026-00000" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Email</label>
+                        <input type="email" id="email" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Username</label>
+                        <input type="text" id="username" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Password</label>
+                        <input type="password" id="password" required minlength="4">
+                    </div>
+                    <button type="submit" class="btn-login">Create Account</button>
+                </form>
+
+                <div class="login-switch">
+                    Already have an account? <a href="index.html">Sign in</a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="assets/js/app.js"></script>
+    <script>
+        document.getElementById('register-form').addEventListener('submit', e => {
+            e.preventDefault();
+            const err = document.getElementById('error-msg');
+            err.style.display = 'none';
+
+            const username = document.getElementById('username').value.trim();
+            const customer = {
+                full_name:  document.getElementById('full_name').value.trim(),
+                student_id: document.getElementById('student_id').value.trim(),
+                email:      document.getElementById('email').value.trim(),
+                username,
+                password:   document.getElementById('password').value
+            };
+
+            // Check for duplicate username (across both users and customers)
+            const dupUser = Store.getUsers().some(u => u.username === username);
+            const dupCust = Store.getCustomers().some(c => c.username === username);
+            if (dupUser || dupCust) {
+                err.textContent = 'Username already taken. Please choose another.';
+                err.style.display = 'block';
+                return;
+            }
+
+            Store.addCustomer(customer);
+            Auth.loginCustomer(customer.username, customer.password);
+            window.location.href = 'shop.html';
+        });
+    </script>
+</body>
+</html>

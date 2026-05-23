@@ -1,0 +1,434 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Products - School Inventory</title>
+    <link rel="stylesheet" href="assets/css/style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+</head>
+<body>
+<div class="layout">
+    <div id="sidebar-root"></div>
+
+    <main class="content">
+        <div id="topbar-root"></div>
+
+        <div class="page-wrap">
+            <header class="page-header">
+                <div>
+                    <h1>Products</h1>
+                    <p>Manage your inventory — add, edit, adjust stock, and export.</p>
+                </div>
+                <div class="page-actions">
+                    <button class="btn" onclick="exportCSV()">⬇ Export</button>
+                    <button class="btn" onclick="bulkDelete()" id="bulk-delete-btn" style="display:none;">🗑 Delete Selected</button>
+                    <button class="btn btn-primary" onclick="openAddModal()">+ Add Product</button>
+                </div>
+            </header>
+
+            <div class="alert alert-success" id="flash-msg" style="display:none;"></div>
+
+            <div class="panel">
+                <div class="panel-header">
+                    <form class="search-form" onsubmit="event.preventDefault(); state.page = 1; render();">
+                        <input type="text" id="search-input" placeholder="🔍 Search by name, category, SKU...">
+                        <select id="category-filter">
+                            <option value="">All Categories</option>
+                        </select>
+                        <select id="stock-filter">
+                            <option value="">All Stock</option>
+                            <option value="low">Low Stock Only</option>
+                            <option value="out">Out of Stock</option>
+                            <option value="in">In Stock</option>
+                        </select>
+                        <button type="button" class="btn btn-ghost" onclick="clearFilters()">Clear</button>
+                    </form>
+                </div>
+
+                <div class="table-wrap">
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th style="width:40px;"><input type="checkbox" id="select-all" class="checkbox"></th>
+                                <th class="sortable" data-sort="sku">SKU<span class="sort-arrow">▾</span></th>
+                                <th class="sortable" data-sort="product_name">Product<span class="sort-arrow">▾</span></th>
+                                <th class="sortable" data-sort="category">Category<span class="sort-arrow">▾</span></th>
+                                <th class="sortable" data-sort="quantity">QTY<span class="sort-arrow">▾</span></th>
+                                <th class="sortable" data-sort="price">Price<span class="sort-arrow">▾</span></th>
+                                <th class="sortable" data-sort="date_added">Date Added<span class="sort-arrow">▾</span></th>
+                                <th>Status</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="products-tbody"></tbody>
+                    </table>
+                </div>
+
+                <div class="pagination">
+                    <div id="pagination-info">Showing 0 of 0</div>
+                    <div class="page-buttons" id="pagination-buttons"></div>
+                </div>
+            </div>
+        </div>
+    </main>
+</div>
+
+<!-- Add Modal -->
+<div class="modal" id="addModal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h2>+ Add New Product</h2>
+            <button class="modal-close" onclick="closeModal('addModal')">&times;</button>
+        </div>
+        <form id="add-form">
+            <div class="form-row">
+                <div class="form-group">
+                    <label>SKU</label>
+                    <input type="text" id="add-sku" placeholder="Auto-generated">
+                </div>
+                <div class="form-group">
+                    <label>Category</label>
+                    <select id="add-category" required></select>
+                </div>
+            </div>
+            <div class="form-group">
+                <label>Product Name *</label>
+                <input type="text" id="add-name" required>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Quantity *</label>
+                    <input type="number" id="add-quantity" min="0" value="0" required>
+                </div>
+                <div class="form-group">
+                    <label>Price (₱) *</label>
+                    <input type="number" id="add-price" step="0.01" min="0" value="0" required>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn" onclick="closeModal('addModal')">Cancel</button>
+                <button type="submit" class="btn btn-primary">Save Product</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Edit Modal -->
+<div class="modal" id="editModal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h2>✏️ Edit Product</h2>
+            <button class="modal-close" onclick="closeModal('editModal')">&times;</button>
+        </div>
+        <form id="edit-form">
+            <input type="hidden" id="edit-id">
+            <div class="form-row">
+                <div class="form-group">
+                    <label>SKU</label>
+                    <input type="text" id="edit-sku">
+                </div>
+                <div class="form-group">
+                    <label>Category</label>
+                    <select id="edit-category" required></select>
+                </div>
+            </div>
+            <div class="form-group">
+                <label>Product Name *</label>
+                <input type="text" id="edit-name" required>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Quantity *</label>
+                    <input type="number" id="edit-quantity" min="0" required>
+                </div>
+                <div class="form-group">
+                    <label>Price (₱) *</label>
+                    <input type="number" id="edit-price" step="0.01" min="0" required>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn" onclick="closeModal('editModal')">Cancel</button>
+                <button type="submit" class="btn btn-primary">Update Product</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script src="assets/js/app.js"></script>
+<script>
+    Auth.requireAdmin();
+    renderSidebar('products');
+    renderTopbar();
+
+    const state = {
+        page: 1,
+        perPage: 8,
+        sort: 'date_added',
+        sortDir: 'desc',
+        selected: new Set()
+    };
+
+    const searchInput = document.getElementById('search-input');
+    const categoryFilter = document.getElementById('category-filter');
+    const stockFilter = document.getElementById('stock-filter');
+
+    // pre-fill search from URL
+    const urlSearch = new URLSearchParams(location.search).get('search');
+    if (urlSearch) searchInput.value = urlSearch;
+
+    function refreshDropdowns() {
+        const cats = Store.getCategories().map(c => c.name);
+        const current = categoryFilter.value;
+        categoryFilter.innerHTML = '<option value="">All Categories</option>' +
+            cats.map(c => `<option value="${escapeHTML(c)}">${escapeHTML(c)}</option>`).join('');
+        categoryFilter.value = current;
+
+        ['add-category', 'edit-category'].forEach(id => {
+            const sel = document.getElementById(id);
+            const cur = sel.value;
+            sel.innerHTML = cats.map(c => `<option value="${escapeHTML(c)}">${escapeHTML(c)}</option>`).join('');
+            if (cur) sel.value = cur;
+        });
+    }
+
+    function filtered() {
+        const search = searchInput.value.trim().toLowerCase();
+        const cat = categoryFilter.value;
+        const stock = stockFilter.value;
+        const threshold = Store.getSettings().low_stock_threshold;
+
+        let list = Store.getProducts();
+        if (search) list = list.filter(p =>
+            p.product_name.toLowerCase().includes(search) ||
+            p.category.toLowerCase().includes(search) ||
+            (p.sku || '').toLowerCase().includes(search)
+        );
+        if (cat) list = list.filter(p => p.category === cat);
+        if (stock === 'low') list = list.filter(p => p.quantity > 0 && p.quantity < threshold);
+        else if (stock === 'out') list = list.filter(p => p.quantity === 0);
+        else if (stock === 'in') list = list.filter(p => p.quantity >= threshold);
+
+        list.sort((a, b) => {
+            const av = a[state.sort], bv = b[state.sort];
+            const cmp = typeof av === 'number' ? av - bv : String(av || '').localeCompare(String(bv || ''));
+            return state.sortDir === 'asc' ? cmp : -cmp;
+        });
+        return list;
+    }
+
+    function render() {
+        refreshDropdowns();
+        const all = filtered();
+        const totalPages = Math.max(1, Math.ceil(all.length / state.perPage));
+        if (state.page > totalPages) state.page = totalPages;
+        const start = (state.page - 1) * state.perPage;
+        const pageItems = all.slice(start, start + state.perPage);
+        const threshold = Store.getSettings().low_stock_threshold;
+
+        const tbody = document.getElementById('products-tbody');
+        if (pageItems.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="9" class="empty">No products found. Try adjusting your search.</td></tr>';
+        } else {
+            tbody.innerHTML = pageItems.map(p => {
+                const isLow = p.quantity < threshold;
+                const isOut = p.quantity === 0;
+                const statusBadge = isOut
+                    ? '<span class="badge badge-danger">Out of Stock</span>'
+                    : isLow ? '<span class="badge badge-warning">Low Stock</span>'
+                    : '<span class="badge badge-success">In Stock</span>';
+                return `
+                    <tr class="${isLow ? 'low-stock' : ''}">
+                        <td><input type="checkbox" class="checkbox row-check" data-id="${p.id}" ${state.selected.has(p.id) ? 'checked' : ''}></td>
+                        <td><span class="product-sku">${escapeHTML(p.sku || '')}</span></td>
+                        <td>
+                            <div class="product-cell">
+                                <div class="product-img">${ICONS[p.category] || '📦'}</div>
+                                <div>
+                                    <div class="product-name">${escapeHTML(p.product_name)}</div>
+                                </div>
+                            </div>
+                        </td>
+                        <td><span class="tag">${escapeHTML(p.category)}</span></td>
+                        <td>
+                            <div class="qty-control">
+                                <button onclick="adjustStock(${p.id}, -1)" title="Remove one">−</button>
+                                <span style="min-width: 32px; text-align: center; font-weight: 600;">${p.quantity}</span>
+                                <button onclick="adjustStock(${p.id}, 1)" title="Add one">+</button>
+                            </div>
+                        </td>
+                        <td><strong>${formatPeso(p.price)}</strong></td>
+                        <td class="text-muted">${formatDate(p.date_added)}</td>
+                        <td>${statusBadge}</td>
+                        <td class="actions">
+                            <button class="btn btn-icon btn-sm" title="Edit" onclick="openEditModal(${p.id})">✏️</button>
+                            <button class="btn btn-icon btn-sm btn-danger" title="Delete" onclick="deleteProduct(${p.id})">🗑</button>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        // Sort arrows
+        document.querySelectorAll('th.sortable').forEach(th => {
+            const isSorted = th.dataset.sort === state.sort;
+            th.classList.toggle('sorted', isSorted);
+            const arrow = th.querySelector('.sort-arrow');
+            if (arrow) arrow.textContent = isSorted ? (state.sortDir === 'asc' ? '▴' : '▾') : '▾';
+        });
+
+        // Pagination
+        document.getElementById('pagination-info').textContent =
+            `Showing ${all.length === 0 ? 0 : start + 1}-${Math.min(start + state.perPage, all.length)} of ${all.length}`;
+        const pb = document.getElementById('pagination-buttons');
+        let buttons = `<button onclick="goPage(${state.page - 1})" ${state.page === 1 ? 'disabled' : ''}>‹</button>`;
+        for (let i = 1; i <= totalPages; i++) {
+            if (i === 1 || i === totalPages || Math.abs(i - state.page) <= 1) {
+                buttons += `<button class="${i === state.page ? 'active' : ''}" onclick="goPage(${i})">${i}</button>`;
+            } else if (Math.abs(i - state.page) === 2) {
+                buttons += `<span style="padding: 0 6px;">…</span>`;
+            }
+        }
+        buttons += `<button onclick="goPage(${state.page + 1})" ${state.page === totalPages ? 'disabled' : ''}>›</button>`;
+        pb.innerHTML = buttons;
+
+        document.getElementById('bulk-delete-btn').style.display = state.selected.size > 0 ? '' : 'none';
+        document.getElementById('select-all').checked = pageItems.length > 0 && pageItems.every(p => state.selected.has(p.id));
+
+        // Wire up checkbox events
+        document.querySelectorAll('.row-check').forEach(cb => {
+            cb.addEventListener('change', () => {
+                const id = parseInt(cb.dataset.id);
+                if (cb.checked) state.selected.add(id); else state.selected.delete(id);
+                render();
+            });
+        });
+    }
+
+    function goPage(n) {
+        const total = Math.ceil(filtered().length / state.perPage);
+        state.page = Math.max(1, Math.min(n, total));
+        render();
+    }
+
+    function clearFilters() {
+        searchInput.value = '';
+        categoryFilter.value = '';
+        stockFilter.value = '';
+        state.selected.clear();
+        state.page = 1;
+        render();
+    }
+
+    function openAddModal() {
+        document.getElementById('add-form').reset();
+        refreshDropdowns();
+        openModal('addModal');
+    }
+
+    document.getElementById('add-form').addEventListener('submit', e => {
+        e.preventDefault();
+        Store.addProduct({
+            sku:          document.getElementById('add-sku').value.trim(),
+            product_name: document.getElementById('add-name').value.trim(),
+            category:     document.getElementById('add-category').value,
+            quantity:     parseInt(document.getElementById('add-quantity').value) || 0,
+            price:        parseFloat(document.getElementById('add-price').value) || 0
+        });
+        closeModal('addModal');
+        flash('Product added successfully.');
+        render();
+    });
+
+    function openEditModal(id) {
+        const p = Store.getProducts().find(x => x.id === id);
+        if (!p) return;
+        refreshDropdowns();
+        document.getElementById('edit-id').value       = p.id;
+        document.getElementById('edit-sku').value      = p.sku || '';
+        document.getElementById('edit-name').value     = p.product_name;
+        document.getElementById('edit-category').value = p.category;
+        document.getElementById('edit-quantity').value = p.quantity;
+        document.getElementById('edit-price').value    = p.price;
+        openModal('editModal');
+    }
+
+    document.getElementById('edit-form').addEventListener('submit', e => {
+        e.preventDefault();
+        const id = parseInt(document.getElementById('edit-id').value);
+        Store.updateProduct(id, {
+            sku:          document.getElementById('edit-sku').value.trim(),
+            product_name: document.getElementById('edit-name').value.trim(),
+            category:     document.getElementById('edit-category').value,
+            quantity:     parseInt(document.getElementById('edit-quantity').value) || 0,
+            price:        parseFloat(document.getElementById('edit-price').value) || 0
+        });
+        closeModal('editModal');
+        flash('Product updated successfully.');
+        render();
+    });
+
+    function deleteProduct(id) {
+        if (!confirm('Delete this product?')) return;
+        Store.deleteProduct(id);
+        state.selected.delete(id);
+        flash('Product deleted successfully.');
+        render();
+    }
+
+    function bulkDelete() {
+        if (state.selected.size === 0) return;
+        if (!confirm(`Delete ${state.selected.size} selected product(s)?`)) return;
+        state.selected.forEach(id => Store.deleteProduct(id));
+        state.selected.clear();
+        flash('Selected products deleted.');
+        render();
+    }
+
+    function adjustStock(id, delta) {
+        Store.adjustStock(id, delta);
+        render();
+    }
+
+    function exportCSV() {
+        const rows = [['SKU', 'Product', 'Category', 'Quantity', 'Price', 'Date Added']];
+        filtered().forEach(p => rows.push([p.sku, p.product_name, p.category, p.quantity, p.price, p.date_added]));
+        downloadCSV('products_' + new Date().toISOString().slice(0,10) + '.csv', rows);
+        flash('CSV exported.');
+    }
+
+    // Sort header click
+    document.querySelectorAll('th.sortable').forEach(th => {
+        th.addEventListener('click', () => {
+            const key = th.dataset.sort;
+            if (state.sort === key) {
+                state.sortDir = state.sortDir === 'asc' ? 'desc' : 'asc';
+            } else {
+                state.sort = key;
+                state.sortDir = 'asc';
+            }
+            render();
+        });
+    });
+
+    // Select all
+    document.getElementById('select-all').addEventListener('change', e => {
+        const checked = e.target.checked;
+        const pageItems = filtered().slice((state.page - 1) * state.perPage, state.page * state.perPage);
+        pageItems.forEach(p => checked ? state.selected.add(p.id) : state.selected.delete(p.id));
+        render();
+    });
+
+    // Live search
+    let searchTimer;
+    searchInput.addEventListener('input', () => {
+        clearTimeout(searchTimer);
+        searchTimer = setTimeout(() => { state.page = 1; render(); }, 250);
+    });
+    categoryFilter.addEventListener('change', () => { state.page = 1; render(); });
+    stockFilter.addEventListener('change', () => { state.page = 1; render(); });
+
+    render();
+</script>
+</body>
+</html>

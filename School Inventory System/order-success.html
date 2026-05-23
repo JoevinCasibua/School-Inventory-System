@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Order Placed - School Supply Shop</title>
+    <link rel="stylesheet" href="assets/css/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+</head>
+<body class="shop-body">
+    <div id="shop-header-root"></div>
+
+    <main class="shop-main">
+        <div class="receipt" id="receipt"></div>
+    </main>
+
+    <script src="assets/js/app.js"></script>
+    <script>
+        Auth.requireCustomer();
+        renderShopHeader('');
+
+        const orderNum = new URLSearchParams(location.search).get('order');
+        const order = Store.getOrders().find(o => o.order_number === orderNum);
+
+        const el = document.getElementById('receipt');
+        if (!order) {
+            el.innerHTML = `
+                <h2>Order Not Found</h2>
+                <p class="text-muted">We couldn't find that order.</p>
+                <a href="shop.html" class="btn btn-primary" style="margin-top:20px;">Back to Shop</a>
+            `;
+        } else {
+            el.innerHTML = `
+                <div class="check">✓</div>
+                <h2>Order Placed!</h2>
+                <p class="text-muted">Thank you for your order. Please pay at the cashier to complete the purchase.</p>
+
+                <div class="order-num">${escapeHTML(order.order_number)}</div>
+
+                <div class="receipt-info">
+                    <div class="cart-summary-row"><span>Customer</span><span>${escapeHTML(order.customer_name)}</span></div>
+                    ${order.student_id ? `<div class="cart-summary-row"><span>Student ID</span><span>${escapeHTML(order.student_id)}</span></div>` : ''}
+                    <div class="cart-summary-row"><span>Items</span><span>${order.items.length} (${order.items.reduce((s, i) => s + i.quantity, 0)} units)</span></div>
+                    <div class="cart-summary-row"><span>Date</span><span>${formatDateTime(order.created_at)}</span></div>
+                    <div class="cart-summary-row total"><span>Total to Pay</span><span>${formatPeso(order.total)}</span></div>
+                </div>
+
+                <div class="payment-method-card" style="text-align:left;">
+                    <div class="icon">💵</div>
+                    <div>
+                        <div class="title">Next Step: Pay at the School Cashier</div>
+                        <div class="desc">Bring this order number to the school cashier and pay <b>${formatPeso(order.total)}</b> in cash. Your items will be reserved for 24 hours.</div>
+                    </div>
+                </div>
+
+                <div style="display:flex;gap:10px;justify-content:center;margin-top:24px;">
+                    <a href="my-orders.html" class="btn">📋 View My Orders</a>
+                    <a href="shop.html" class="btn btn-primary">Continue Shopping</a>
+                </div>
+            `;
+        }
+    </script>
+</body>
+</html>

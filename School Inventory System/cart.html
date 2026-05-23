@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>My Cart - School Supply Shop</title>
+    <link rel="stylesheet" href="assets/css/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+</head>
+<body class="shop-body">
+    <div id="shop-header-root"></div>
+
+    <main class="shop-main">
+        <header class="page-header">
+            <div>
+                <h1>🛒 My Cart</h1>
+                <p>Review your items, then place your order. Pay in cash at the school cashier.</p>
+            </div>
+            <a href="shop.html" class="btn">← Continue Shopping</a>
+        </header>
+
+        <div class="alert alert-success" id="flash-msg" style="display:none;"></div>
+
+        <div id="cart-content"></div>
+    </main>
+
+    <!-- Checkout Confirm Modal -->
+    <div class="modal" id="confirmModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Confirm Your Order</h2>
+                <button class="modal-close" onclick="closeModal('confirmModal')">&times;</button>
+            </div>
+            <div style="padding: 24px;">
+                <p style="margin-bottom: 16px;">Please confirm your order details:</p>
+
+                <div class="receipt-info" id="confirm-summary"></div>
+
+                <div class="payment-method-card">
+                    <div class="icon">💵</div>
+                    <div>
+                        <div class="title">Payment Method: Cash at School Cashier</div>
+                        <div class="desc">After placing your order, please pay in cash at the school cashier within 24 hours to claim your items. Your order will be cancelled if unpaid.</div>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label>Notes (optional)</label>
+                    <textarea id="order-notes" rows="2" placeholder="Any special instructions..."></textarea>
+                </div>
+
+                <div class="modal-footer">
+                    <button type="button" class="btn" onclick="closeModal('confirmModal')">Cancel</button>
+                    <button type="button" class="btn btn-primary" onclick="placeOrder()">✓ Place Order</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="assets/js/app.js"></script>
+    <script>
+        Auth.requireCustomer();
+        renderShopHeader('cart');
+
+        function render() {
+            const items = Cart.detailed();
+            const el = document.getElementById('cart-content');
+
+            if (items.length === 0) {
+                el.innerHTML = `
+                    <div class="panel">
+                        <div class="panel-body" style="text-align:center; padding: 60px 20px;">
+                            <div style="font-size: 80px; margin-bottom: 20px;">🛒</div>
+                            <h2 style="margin-bottom: 12px;">Your cart is empty</h2>
+                            <p class="text-muted" style="margin-bottom: 24px;">Browse the shop and add items to get started.</p>
+                            <a href="shop.html" class="btn btn-primary">Browse Products</a>
+                        </div>
+                    </div>
+                `;
+                return;
+            }
+
+            const total = Cart.total();
+            el.innerHTML = `
+                <div class="cart-grid">
+                    <div class="panel">
+                        <div class="panel-header"><h2>${items.length} Item${items.length > 1 ? 's' : ''} in Cart</h2></div>
+                        ${items.map(i => `
+                            <div class="cart-item">
+                                <div class="cart-item-img">${ICONS[i.category] || '📦'}</div>
+                                <div>
+                                    <div class="cart-item-name">${escapeHTML(i.name)}</div>
+                                    <div class="cart-item-meta">${escapeHTML(i.sku)} · ${escapeHTML(i.category)}</div>
+                                    <div class="cart-item-meta">${formatPeso(i.price)} each</div>
+                                </div>
+                                <div class="qty-control">
+                                    <button onclick="changeQty(${i.product_id}, ${i.quantity - 1})">−</button>
+                                    <span style="min-width: 32px; text-align: center; font-weight: 600;">${i.quantity}</span>
+                                    <button onclick="changeQty(${i.product_id}, ${i.quantity + 1})">+</button>
+                                </div>
+                                <div style="font-weight: 700; min-width: 80px; text-align: right;">${formatPeso(i.subtotal)}</div>
+                                <button class="btn btn-icon btn-sm btn-danger" onclick="removeItem(${i.product_id})">🗑</button>
+                            </div>
+                        `).join('')}
+                    </div>
+
+                    <div>
+                        <div class="panel">
+                            <div class="panel-header"><h2>Order Summary</h2></div>
+                            <div class="panel-body">
+                                <div class="cart-summary-row">
+                                    <span>Items</span>
+                                    <span>${items.reduce((s, i) => s + i.quantity, 0)}</span>
+                                </div>
+                                <div class="cart-summary-row">
+                                    <span>Subtotal</span>
+                                    <span>${formatPeso(total)}</span>
+                                </div>
+                                <div class="cart-summary-row total">
+                                    <span>Total</span>
+                                    <span>${formatPeso(total)}</span>
+                                </div>
+
+                                <div class="payment-method-card" style="margin-top: 20px;">
+                                    <div class="icon">💵</div>
+                                    <div>
+                                        <div class="title">Cash at Cashier</div>
+                                        <div class="desc">Pay in cash at the school cashier when you pick up.</div>
+                                    </div>
+                                </div>
+
+                                <button class="btn btn-primary btn-block" style="margin-top: 16px;" onclick="openCheckout()">
+                                    Proceed to Checkout →
+                                </button>
+                                <button class="btn btn-ghost btn-block" style="margin-top: 8px;" onclick="clearCart()">
+                                    Clear Cart
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        function changeQty(id, qty) {
+            if (qty > 0) {
+                const product = Store.getProduct(id);
+                if (qty > product.quantity) {
+                    flash(`Only ${product.quantity} available in stock.`, 'error');
+                    return;
+                }
+            }
+            Cart.updateQty(id, qty);
+            render();
+            renderShopHeader('cart');
+        }
+
+        function removeItem(id) {
+            Cart.remove(id);
+            flash('Item removed from cart.');
+            render();
+            renderShopHeader('cart');
+        }
+
+        function clearCart() {
+            if (!confirm('Empty your entire cart?')) return;
+            Cart.clear();
+            flash('Cart cleared.');
+            render();
+            renderShopHeader('cart');
+        }
+
+        function openCheckout() {
+            const items = Cart.detailed();
+            const total = Cart.total();
+            document.getElementById('confirm-summary').innerHTML = `
+                <div class="cart-summary-row"><span>Items</span><span>${items.length} (${items.reduce((s, i) => s + i.quantity, 0)} units)</span></div>
+                <div class="cart-summary-row"><span>Customer</span><span>${escapeHTML(Auth.currentUser().full_name || Auth.currentUser().username)}</span></div>
+                <div class="cart-summary-row total"><span>Total Amount</span><span>${formatPeso(total)}</span></div>
+            `;
+            openModal('confirmModal');
+        }
+
+        function placeOrder() {
+            const user = Auth.currentUser();
+            const items = Cart.detailed();
+            if (items.length === 0) { flash('Cart is empty.', 'error'); return; }
+
+            // Re-check stock
+            for (const i of items) {
+                const p = Store.getProduct(i.product_id);
+                if (!p || p.quantity < i.quantity) {
+                    flash(`"${i.name}" no longer has enough stock. Please update your cart.`, 'error');
+                    closeModal('confirmModal');
+                    render();
+                    return;
+                }
+            }
+
+            const order = Store.addOrder({
+                customer_id: user.id,
+                customer_name: user.full_name || user.username,
+                student_id: user.student_id,
+                items: items.map(i => ({
+                    product_id: i.product_id,
+                    name: i.name,
+                    sku: i.sku,
+                    price: i.price,
+                    quantity: i.quantity,
+                    subtotal: i.subtotal
+                })),
+                total: Cart.total(),
+                payment_method: 'cash_cashier',
+                notes: document.getElementById('order-notes').value.trim()
+            });
+
+            Cart.clear();
+            closeModal('confirmModal');
+            window.location.href = 'order-success.html?order=' + order.order_number;
+        }
+
+        render();
+    </script>
+</body>
+</html>

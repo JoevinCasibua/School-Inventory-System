@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Settings - School Inventory</title>
+    <link rel="stylesheet" href="assets/css/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+</head>
+<body>
+<div class="layout">
+    <div id="sidebar-root"></div>
+
+    <main class="content">
+        <div id="topbar-root"></div>
+
+        <div class="page-wrap">
+            <header class="page-header">
+                <div>
+                    <h1>Settings</h1>
+                    <p>Configure your inventory system preferences.</p>
+                </div>
+            </header>
+
+            <div class="alert alert-success" id="flash-msg" style="display:none;"></div>
+
+            <div class="dashboard-grid-2">
+                <div class="panel">
+                    <div class="panel-header"><h2>⚙️ General Settings</h2></div>
+                    <div class="panel-body">
+                        <form id="settings-form">
+                            <div class="form-group">
+                                <label>Store Name</label>
+                                <input type="text" id="s-name" required>
+                            </div>
+                            <div class="form-group">
+                                <label>Currency Symbol</label>
+                                <input type="text" id="s-currency" required maxlength="3">
+                            </div>
+                            <div class="form-group">
+                                <label>Low Stock Threshold</label>
+                                <input type="number" id="s-threshold" min="1" required>
+                                <small class="text-muted" style="display:block;margin-top:6px;">
+                                    Products with quantity below this will be marked as low stock.
+                                </small>
+                            </div>
+                            <button type="submit" class="btn btn-primary">Save Settings</button>
+                        </form>
+                    </div>
+                </div>
+
+                <div class="panel">
+                    <div class="panel-header"><h2>💾 Data Management</h2></div>
+                    <div class="panel-body">
+                        <p class="text-muted mb-3" style="font-size:14px;">
+                            Backup, restore, or reset your inventory data.
+                        </p>
+                        <div style="display:flex;flex-direction:column;gap:10px;">
+                            <button class="btn" onclick="exportData()">⬇ Export All Data (JSON)</button>
+                            <label class="btn" style="cursor:pointer;text-align:center;justify-content:center;">
+                                ⬆ Import Data (JSON)
+                                <input type="file" id="import-file" accept="application/json" style="display:none;">
+                            </label>
+                            <button class="btn btn-danger" onclick="resetAll()">🗑 Reset All Data</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="panel">
+                    <div class="panel-header"><h2>📊 System Info</h2></div>
+                    <div class="panel-body">
+                        <div class="cards" style="margin-bottom:0;grid-template-columns:1fr 1fr;">
+                            <div class="card">
+                                <div class="card-icon">📦</div>
+                                <div class="card-info">
+                                    <h3 id="info-products">0</h3>
+                                    <p>Products</p>
+                                </div>
+                            </div>
+                            <div class="card blue">
+                                <div class="card-icon">📁</div>
+                                <div class="card-info">
+                                    <h3 id="info-cats">0</h3>
+                                    <p>Categories</p>
+                                </div>
+                            </div>
+                            <div class="card orange">
+                                <div class="card-icon">👥</div>
+                                <div class="card-info">
+                                    <h3 id="info-users">0</h3>
+                                    <p>Users</p>
+                                </div>
+                            </div>
+                            <div class="card red">
+                                <div class="card-icon">📋</div>
+                                <div class="card-info">
+                                    <h3 id="info-activity">0</h3>
+                                    <p>Log Entries</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="panel">
+                    <div class="panel-header"><h2>👤 Your Account</h2></div>
+                    <div class="panel-body">
+                        <form id="account-form">
+                            <div class="form-group">
+                                <label>Username</label>
+                                <input type="text" id="a-username" disabled>
+                            </div>
+                            <div class="form-group">
+                                <label>New Password</label>
+                                <input type="password" id="a-password" placeholder="Leave blank to keep current">
+                            </div>
+                            <button type="submit" class="btn btn-primary">Update Password</button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+</div>
+
+<script src="assets/js/app.js"></script>
+<script>
+    Auth.requireAdmin();
+    renderSidebar('settings');
+    renderTopbar();
+
+    function loadSettings() {
+        const s = Store.getSettings();
+        document.getElementById('s-name').value = s.store_name;
+        document.getElementById('s-currency').value = s.currency;
+        document.getElementById('s-threshold').value = s.low_stock_threshold;
+
+        const data = Store.load();
+        document.getElementById('info-products').textContent = data.products.length;
+        document.getElementById('info-cats').textContent = data.categories.length;
+        document.getElementById('info-users').textContent = data.users.length;
+        document.getElementById('info-activity').textContent = data.activity.length;
+
+        document.getElementById('a-username').value = Auth.currentUser()?.username || '';
+    }
+
+    document.getElementById('settings-form').addEventListener('submit', e => {
+        e.preventDefault();
+        Store.updateSettings({
+            store_name: document.getElementById('s-name').value.trim(),
+            currency: document.getElementById('s-currency').value.trim(),
+            low_stock_threshold: parseInt(document.getElementById('s-threshold').value) || 5
+        });
+        flash('Settings saved.');
+        loadSettings();
+    });
+
+    document.getElementById('account-form').addEventListener('submit', e => {
+        e.preventDefault();
+        const newPw = document.getElementById('a-password').value;
+        if (!newPw) { flash('Enter a new password.', 'error'); return; }
+        const data = Store.load();
+        const user = Auth.currentUser();
+        const idx = data.users.findIndex(u => u.id === user.id);
+        if (idx !== -1) {
+            data.users[idx].password = newPw;
+            Store.save(data);
+            Activity.log('edit', `User "${user.username}" updated their password`);
+            document.getElementById('a-password').value = '';
+            flash('Password updated.');
+        }
+    });
+
+    function exportData() {
+        const data = Store.load();
+        const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'inventory_backup_' + new Date().toISOString().slice(0,10) + '.json';
+        a.click();
+        URL.revokeObjectURL(url);
+        flash('Data exported.');
+    }
+
+    document.getElementById('import-file').addEventListener('change', e => {
+        const file = e.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = ev => {
+            try {
+                const data = JSON.parse(ev.target.result);
+                if (!data.products || !data.users) throw new Error('Invalid backup');
+                if (!confirm('Import will overwrite all current data. Continue?')) return;
+                Store.save(data);
+                flash('Data imported successfully.');
+                loadSettings();
+            } catch (err) {
+                flash('Invalid backup file.', 'error');
+            }
+        };
+        reader.readAsText(file);
+    });
+
+    function resetAll() {
+        if (!confirm('Reset ALL data to defaults? This cannot be undone.')) return;
+        if (!confirm('Are you absolutely sure?')) return;
+        Store.resetData();
+        flash('All data reset to defaults.');
+        setTimeout(() => location.reload(), 800);
+    }
+
+    loadSettings();
+</script>
+</body>
+</html>

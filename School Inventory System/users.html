@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Users - School Inventory</title>
+    <link rel="stylesheet" href="assets/css/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+</head>
+<body>
+<div class="layout">
+    <div id="sidebar-root"></div>
+
+    <main class="content">
+        <div id="topbar-root"></div>
+
+        <div class="page-wrap">
+            <header class="page-header">
+                <div>
+                    <h1>Users</h1>
+                    <p>Manage admin users who can access this system.</p>
+                </div>
+                <div class="page-actions">
+                    <button class="btn btn-primary" onclick="openAddModal()">+ Add User</button>
+                </div>
+            </header>
+
+            <div class="alert alert-success" id="flash-msg" style="display:none;"></div>
+
+            <div class="panel">
+                <div class="panel-header"><h2>System Users</h2></div>
+                <div class="table-wrap">
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Username</th>
+                                <th>Email</th>
+                                <th>Role</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="user-tbody"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </main>
+</div>
+
+<div class="modal" id="addModal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h2>+ Add User</h2>
+            <button class="modal-close" onclick="closeModal('addModal')">&times;</button>
+        </div>
+        <form id="user-form">
+            <div class="form-group">
+                <label>Username *</label>
+                <input type="text" id="u-username" required>
+            </div>
+            <div class="form-group">
+                <label>Email</label>
+                <input type="email" id="u-email">
+            </div>
+            <div class="form-group">
+                <label>Password *</label>
+                <input type="password" id="u-password" required minlength="4">
+            </div>
+            <div class="form-group">
+                <label>Role *</label>
+                <select id="u-role" required>
+                    <option value="Admin">Admin</option>
+                    <option value="Super Admin">Super Admin</option>
+                    <option value="Staff">Staff</option>
+                </select>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn" onclick="closeModal('addModal')">Cancel</button>
+                <button type="submit" class="btn btn-primary">Create User</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script src="assets/js/app.js"></script>
+<script>
+    Auth.requireAdmin();
+    renderSidebar('users');
+    renderTopbar();
+
+    function render() {
+        const users = Store.getUsers();
+        const current = Auth.currentUser();
+        const tbody = document.getElementById('user-tbody');
+
+        tbody.innerHTML = users.map(u => `
+            <tr>
+                <td>#${u.id}</td>
+                <td>
+                    <div class="product-cell">
+                        <div class="avatar" style="width:34px;height:34px;font-size:13px;">${escapeHTML(u.username[0].toUpperCase())}</div>
+                        <div class="product-name">${escapeHTML(u.username)} ${u.id === current?.id ? '<span class="tag" style="margin-left:6px;">You</span>' : ''}</div>
+                    </div>
+                </td>
+                <td class="text-muted">${escapeHTML(u.email || '—')}</td>
+                <td><span class="badge ${u.role === 'Super Admin' ? 'badge-success' : 'badge-warning'}">${escapeHTML(u.role || 'Admin')}</span></td>
+                <td class="actions">
+                    ${u.id === current?.id
+                        ? '<span class="text-muted" style="font-size:12px;">Current user</span>'
+                        : `<button class="btn btn-icon btn-sm btn-danger" onclick="deleteUser(${u.id})">🗑</button>`}
+                </td>
+            </tr>
+        `).join('');
+    }
+
+    function openAddModal() {
+        document.getElementById('user-form').reset();
+        openModal('addModal');
+    }
+
+    document.getElementById('user-form').addEventListener('submit', e => {
+        e.preventDefault();
+        const username = document.getElementById('u-username').value.trim();
+        if (Store.getUsers().some(u => u.username === username)) {
+            alert('Username already exists.');
+            return;
+        }
+        Store.addUser({
+            username,
+            email:    document.getElementById('u-email').value.trim(),
+            password: document.getElementById('u-password').value,
+            role:     document.getElementById('u-role').value
+        });
+        closeModal('addModal');
+        flash('User created successfully.');
+        render();
+    });
+
+    function deleteUser(id) {
+        if (!confirm('Delete this user?')) return;
+        Store.deleteUser(id);
+        flash('User deleted.');
+        render();
+    }
+
+    render();
+</script>
+</body>
+</html>
